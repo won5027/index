@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>사격 수행평가 기록판 (구글 시트 연동)</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@500;700&display=swap');
+
+:root{
+  --bg:#14170F;--panel:#1C2016;--panel2:#242A19;--line:#3A422E;--line-soft:#2A3020;
+  --od:#4C5B3A;--od-light:#7C8F5F;--brass:#D9C293;--brass-dim:#9C8F6C;
+  --red:#C4402A;--red-light:#E0684F;--text:#EDE8DC;--text-dim:#A7A996;
+  --font-d:'Bebas Neue',sans-serif;--font-b:'IBM Plex Sans KR',sans-serif;--font-m:'IBM Plex Mono',monospace;
+}
+*{box-sizing:border-box;}
+body{
+  margin:0;background:var(--bg);color:var(--text);font-family:var(--font-b);min-height:100vh;
+  background-image:linear-gradient(var(--line-soft) 1px, transparent 1px),linear-gradient(90deg, var(--line-soft) 1px, transparent 1px);
+  background-size:28px 28px;background-position:-1px -1px;
+}
+#app{max-width:960px;margin:0 auto;padding:20px 16px 60px;}
+
+.header{display:flex;align-items:center;justify-content:space-between;border-top:3px solid var(--brass);border-bottom:1px solid var(--line);padding:14px 4px 12px;margin-bottom:22px;gap:12px;}
+.header-title{display:flex;align-items:center;gap:12px;cursor:pointer;}
+.header-title h1{font-family:var(--font-d);font-size:30px;letter-spacing:1px;margin:0;color:var(--text);line-height:1;}
+.header-eyebrow{font-family:var(--font-m);font-size:11px;color:var(--brass-dim);letter-spacing:2px;margin:0 0 2px;text-transform:uppercase;}
+.badge{font-family:var(--font-m);font-size:11px;padding:5px 10px;border:1px solid var(--line);color:var(--text-dim);white-space:nowrap;}
+
+.card{background:var(--panel);border:1px solid var(--line);padding:20px;margin-bottom:16px;}
+.card-title{font-family:var(--font-d);font-size:20px;letter-spacing:0.5px;margin:0 0 14px;padding-bottom:10px;border-bottom:1px solid var(--line);color:var(--brass);}
+
+.mode-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;}
+.mode-card{background:var(--panel);border:1px solid var(--line);padding:24px 18px;text-align:left;cursor:pointer;color:var(--text);font-family:var(--font-b);transition:border-color .15s, transform .1s;}
+.mode-card:hover{border-color:var(--brass);transform:translateY(-2px);}
+.mode-icon{margin-bottom:14px;}
+.mode-card h2{font-family:var(--font-d);font-size:22px;margin:0 0 6px;letter-spacing:0.5px;}
+.mode-card p{font-size:13px;color:var(--text-dim);margin:0;line-height:1.5;}
+
+label{display:block;font-size:12px;color:var(--text-dim);margin-bottom:5px;font-family:var(--font-m);letter-spacing:0.5px;}
+input[type=text],input[type=number],input[type=password]{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);padding:10px 11px;font-family:var(--font-m);font-size:15px;}
+input:focus{outline:none;border-color:var(--brass);}
+.field-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:10px;margin-bottom:14px;}
+.field-row.wide{grid-template-columns:1fr;}
+
+button{font-family:var(--font-b);font-weight:500;font-size:14px;padding:10px 18px;background:transparent;border:1px solid var(--od-light);color:var(--text);cursor:pointer;transition:background .12s;}
+button:hover{background:var(--panel2);border-color:var(--brass);}
+button.primary{background:var(--od);border-color:var(--od-light);}
+button.primary:hover{background:var(--od-light);}
+button.ghost{border-color:var(--line);color:var(--text-dim);}
+button:disabled{opacity:0.4;cursor:not-allowed;}
+
+.btn-row{display:flex;gap:8px;flex-wrap:wrap;}
+
+.session-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:16px;}
+.session-tab{border:1px solid var(--line);background:var(--bg);text-align:center;padding:10px 4px;cursor:pointer;font-family:var(--font-m);}
+.session-tab .num{font-family:var(--font-d);font-size:20px;display:block;line-height:1;color:var(--text-dim);}
+.session-tab .val{font-size:11px;display:block;margin-top:4px;color:var(--od-light);}
+.session-tab.empty .val{color:var(--line);}
+.session-tab.active{border-color:var(--brass);background:var(--panel2);}
+.session-tab.active .num{color:var(--brass);}
+
+.summary-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:16px 0;}
+.metric{background:var(--bg);border:1px solid var(--line);padding:12px;text-align:center;}
+.metric .n{font-family:var(--font-d);font-size:26px;color:var(--brass);}
+.metric .l{font-size:11px;color:var(--text-dim);font-family:var(--font-m);letter-spacing:1px;}
+
+table{width:100%;border-collapse:collapse;font-family:var(--font-m);font-size:13px;}
+th,td{padding:8px 6px;text-align:center;border-bottom:1px solid var(--line-soft);}
+th{color:var(--brass-dim);font-weight:500;font-size:11px;letter-spacing:0.5px;border-bottom:1px solid var(--line);}
+td.name-cell{text-align:left;font-family:var(--font-b);}
+.table-wrap{overflow-x:auto;}
+
+.tabs{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;}
+.tab-btn{padding:8px 14px;border:1px solid var(--line);background:var(--bg);color:var(--text-dim);cursor:pointer;font-size:13px;font-family:var(--font-b);}
+.tab-btn.active{border-color:var(--brass);color:var(--brass);background:var(--panel2);}
+
+.filter-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;align-items:end;}
+.filter-row .field-row{margin-bottom:0;flex:1;min-width:110px;}
+select{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);padding:10px 11px;font-family:var(--font-m);font-size:14px;}
+
+.class-group{margin-bottom:22px;}
+.class-group h3{font-family:var(--font-d);font-size:17px;color:var(--brass);margin:0 0 8px;letter-spacing:0.5px;}
+
+.msg{padding:10px 12px;border-left:3px solid var(--red);background:rgba(196,64,42,0.1);color:var(--red-light);font-size:13px;margin-bottom:12px;}
+.msg.ok{border-left-color:var(--od-light);background:rgba(124,143,95,0.12);color:var(--od-light);}
+
+.pin-box{max-width:280px;margin:0 auto;text-align:center;}
+.pin-box input{text-align:center;letter-spacing:6px;font-size:20px;}
+.footer-note{text-align:center;font-size:11px;color:var(--line);margin-top:30px;font-family:var(--font-m);}
+.editable{cursor:pointer;border-bottom:1px dashed var(--line);}
+.editable:hover{color:var(--brass);}
+.empty-state{text-align:center;padding:30px 10px;color:var(--text-dim);font-size:13px;}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+// ⭐ 구글 Apps Script 웹 앱 URL을 여기에 붙여넣으세요.
+const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz0GO3mzZ8tZ0LwldCSAwuCbLzabC6LDupf1J1-Vb_badUR1mWvml6ZfwpWYd7DOcIOkQ/exec";
+
+const SESSIONS=[1,2,3,4,5,6,7,8,9,10];
+let DB={students:{}};
+let SETTINGS={pin:'2025',publicPin:'1234'};
+let VIEW='landing';
+let student=null;
+let studentActiveSession=1;
+let publicAuthed=false;
+let teacherAuthed=false;
+let teacherTab='list';
+let filterGrade='all';
+let filterClass='all';
+let rankSession=1;
+let rankMode='all';
+let publicSession='overall';
+let isLoading=false;
+
+function pad2(n){return String(n).padStart(2,'0');}
+function sid(g,c,n){return g+'-'+c+'-'+pad2(n);}
+function classKey(g,c){return g+'-'+c;}
+
+// 구글 시트에서 전체 데이터 불러오기
+async function fetchServerDB(){
+  if(!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.includes("여기에_구글")) return;
+  isLoading = true;
+  try{
+    const res = await fetch(GOOGLE_SCRIPT_URL);
+    const data = await res.json();
+    if(data) DB.students = data;
+  }catch(e){console.error(e);}
+  isLoading = false;
+}
+
+// 구글 시트로 데이터 전송하기
+async function syncToServer(payload){
+  if(!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.includes("여기에_구글")) return;
+  try{
+    await fetch(GOOGLE_SCRIPT_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload)
+    });
+  }catch(e){console.error(e);}
+}
+
+function targetSVG(size){
+  size=size||64;const c=size/2, r=size/2-2;
+  const colors=['#C4402A','#D9C293','#4C5B3A','#242A19'];
+  let circles='';
+  for(let i=0;i<4;i++){circles+='<circle cx="'+c+'" cy="'+c+'" r="'+(r-i*(r/4))+'" fill="none" stroke="'+colors[i]+'" stroke-width="2"/>';}
+  return '<svg width="'+size+'" height="'+size+'" viewBox="0 0 '+size+' '+size+'">'+circles+
+    '<line x1="'+c+'" y1="0" x2="'+c+'" y2="'+size+'" stroke="'+colors[0]+'" stroke-width="1" opacity="0.5"/>'+
+    '<line x1="0" y1="'+c+'" x2="'+size+'" y2="'+c+'" stroke="'+colors[0]+'" stroke-width="1" opacity="0.5"/></svg>';
+}
+
+function allStudents(){return Object.values(DB.students);}
+function maxScore(st){
+  const vals=SESSIONS.map(s=>st.scores[s]).filter(v=>v!==null&&v!==undefined&&v!=='');
+  return vals.length?Math.max(...vals):null;
+}
+function avgScore(st){
+  const vals=SESSIONS.map(s=>st.scores[s]).filter(v=>v!==null&&v!==undefined&&v!=='');
+  return vals.length?(vals.reduce((a,b)=>a+Number(b),0)/vals.length):null;
+}
+function filledCount(st){
+  return SESSIONS.filter(s=>st.scores[s]!==null&&st.scores[s]!==undefined&&st.scores[s]!=='').length;
+}
+function fmt(v){return v===null||v===undefined?'-':(Number.isInteger(v)?v:v.toFixed(1));}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+function render(){
+  const app=document.getElementById('app');
+  app.innerHTML=header()+body();
+  bindEvents();
+}
+
+function header(){
+  return '<div class="header">'+
+    '<div class="header-title" id="goHome">'+targetSVG(38)+
+    '<div><p class="header-eyebrow">shooting range · real-time sync</p><h1>사격 수행평가 기록판</h1></div></div>'+
+    '<span class="badge">구글 시트 연동 중</span>'+
+    '</div>';
+}
+
+function body(){
+  if(VIEW==='landing')return landing();
+  if(VIEW==='student')return studentView();
+  if(VIEW==='teacher')return teacherView();
+  if(VIEW==='public')return publicView();
+  return '';
+}
+
+function landing(){
+  return '<div class="mode-grid">'+
+    '<div class="mode-card" data-go="student"><div class="mode-icon">'+targetSVG(40)+'</div>'+
+    '<h2>학생 모드</h2><p>학년·반·번호·이름을 입력하고 차시별 점수를 직접 기록합니다.</p></div>'+
+    '<div class="mode-card" data-go="teacherGate"><div class="mode-icon">'+targetSVG(40)+'</div>'+
+    '<h2>교사 모드</h2><p>실시간 모아보기, 학반별 명단 확인, 엑셀 다운로드.</p></div>'+
+    '<div class="mode-card" data-go="publicGate"><div class="mode-icon">'+targetSVG(40)+'</div>'+
+    '<h2>공개 순위 화면</h2><p>PIN 입력 후 열람. 체육관 스크린용 실시간 순위 화면입니다.</p></div>'+
+    '</div>'+
+    '<p class="footer-note">모든 데이터는 선생님의 구글 시트와 실시간 연동됩니다.</p>';
+}
+
+function studentView(){
+  if(!student){
+    return '<div class="card">'+
+      '<h2 class="card-title">사수 등록 / 조회</h2>'+
+      '<div id="msgBox"></div>'+
+      '<div class="field-row">'+
+        '<div><label>학년</label><input type="number" id="f_grade" min="1" max="3" placeholder="2"></div>'+
+        '<div><label>반</label><input type="number" id="f_class" min="1" max="20" placeholder="3"></div>'+
+        '<div><label>번호</label><input type="number" id="f_num" min="1" max="50" placeholder="7"></div>'+
+      '</div>'+
+      '<div class="field-row wide"><div><label>이름</label><input type="text" id="f_name" placeholder="홍길동"></div></div>'+
+      '<div class="btn-row"><button class="primary" id="studentStart">조회 / 시작</button>'+
+      '<button class="ghost" id="backHome">뒤로</button></div>'+
+      '</div>';
+  }
+  const st=student;
+  const tabs=SESSIONS.map(s=>{
+    const v=st.scores[s];
+    const filled=v!==null&&v!==undefined&&v!=='';
+    return '<div class="session-tab '+(s===studentActiveSession?'active':'')+' '+(filled?'':'empty')+'" data-session="'+s+'">'+
+      '<span class="num">'+s+'</span><span class="val">'+(filled?v:'미기록')+'</span></div>';
+  }).join('');
+  const curVal=st.scores[studentActiveSession];
+  return '<div class="card">'+
+    '<h2 class="card-title">'+esc(st.grade)+'학년 '+esc(st.cls)+'반 '+pad2(st.number)+'번 '+esc(st.name)+'</h2>'+
+    '<div id="msgBox"></div>'+
+    '<label>차시 선택</label>'+
+    '<div class="session-grid">'+tabs+'</div>'+
+    '<label>'+studentActiveSession+'차시 점수 입력</label>'+
+    '<div class="field-row"><div><input type="number" id="scoreInput" value="'+(curVal===null||curVal===undefined?'':curVal)+'" placeholder="0-100"></div></div>'+
+    '<div class="btn-row"><button class="primary" id="saveScore">저장 및 서버 전송</button>'+
+    '<button class="ghost" id="switchStudent">다른 학생으로 전환</button>'+
+    '<button class="ghost" id="backHome">처음으로</button></div>'+
+    '<div class="summary-row">'+
+      '<div class="metric"><div class="n">'+fmt(maxScore(st))+'</div><div class="l">최고점</div></div>'+
+      '<div class="metric"><div class="n">'+fmt(avgScore(st))+'</div><div class="l">평균</div></div>'+
+      '<div class="metric"><div class="n">'+filledCount(st)+'/10</div><div class="l">기록 완료</div></div>'+
+    '</div>'+
+  '</div>';
+}
+
+function teacherView(){
+  if(!teacherAuthed){
+    return '<div class="card"><div class="pin-box">'+
+      '<h2 class="card-title" style="text-align:center;">교사 인증</h2>'+
+      '<div id="msgBox"></div>'+
+      '<label>PIN 입력</label>'+
+      '<input type="password" id="pinInput" maxlength="8">'+
+      '<div class="btn-row" style="justify-content:center;margin-top:14px;">'+
+      '<button class="primary" id="pinSubmit">입장</button>'+
+      '<button class="ghost" id="backHome">뒤로</button></div>'+
+      '</div></div>';
+  }
+  const tabs=[['list','학생 목록'],['rank','순위표'],['excel','엑셀 다운로드']];
+  const tabHtml=tabs.map(t=>'<div class="tab-btn '+(teacherTab===t[0]?'active':'')+'" data-tab="'+t[0]+'">'+t[1]+'</div>').join('');
+  let content='';
+  if(teacherTab==='list')content=teacherList();
+  else if(teacherTab==='rank')content=teacherRank();
+  else if(teacherTab==='excel')content=teacherExcel();
+  return '<div class="tabs">'+tabHtml+'</div>'+
+    '<div id="msgBox"></div>'+content+
+    '<div class="btn-row" style="margin-top:16px;"><button class="primary" id="refreshTeacher">구글 시트 데이터 새로고침</button>'+
+    '<button class="ghost" id="backHome">처음으로</button></div>';
+}
+
+function teacherList(){
+  const list=allStudents().filter(s=>(filterGrade==='all'||s.grade==Number(filterGrade))&&(filterClass==='all'||s.cls==Number(filterClass)));
+  if(!list.length)return '<div class="empty-state">등록된 학생이 없거나 서버 데이터를 불러오는 중입니다.</div>';
+  const groups={};
+  list.forEach(s=>{const k=classKey(s.grade,s.cls);(groups[k]=groups[k]||[]).push(s);});
+  let html='';
+  Object.keys(groups).sort().forEach(k=>{
+    const arr=groups[k].sort((a,b)=>a.number-b.number);
+    html+='<div class="class-group"><h3>'+arr[0].grade+'학년 '+arr[0].cls+'반</h3><div class="table-wrap"><table><thead><tr><th>번호</th><th>이름</th>'+
+      SESSIONS.map(s=>'<th>'+s+'차시</th>').join('')+'<th>최고</th><th>평균</th></tr></thead><tbody>'+
+      arr.map(st=>'<tr><td>'+pad2(st.number)+'</td><td class="name-cell">'+esc(st.name)+'</td>'+
+        SESSIONS.map(s=>'<td>'+(st.scores[s]===null||st.scores[s]===undefined||st.scores[s]===''?'-':st.scores[s])+'</td>').join('')+
+        '<td>'+fmt(maxScore(st))+'</td><td>'+fmt(avgScore(st))+'</td></tr>').join('')+
+      '</tbody></table></div></div>';
+  });
+  return html;
+}
+
+function teacherRank(){
+  const list=allStudents().filter(s=>maxScore(s)!==null).sort((a,b)=>maxScore(b)-maxScore(a));
+  return rankTable(list,null);
+}
+
+function rankTable(list,session){
+  if(!list.length)return '<div class="empty-state">표시할 기록이 없습니다.</div>';
+  let rows=list.map((st,i)=>{
+    const val=session?st.scores[session]:maxScore(st);
+    return '<tr><td>'+(i+1)+'</td><td class="name-cell">'+st.grade+'-'+st.cls+'-'+pad2(st.number)+' '+esc(st.name)+'</td><td>'+val+'</td></tr>';
+  }).join('');
+  return '<div class="table-wrap"><table><thead><tr><th>순위</th><th>학생</th><th>점수</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+}
+
+function teacherExcel(){
+  return '<p style="color:var(--text-dim);font-size:13px;margin-bottom:14px;">현재 구글 시트에서 불러온 학생 기록을 학년-반별 시트로 나눠 엑셀로 저장합니다.</p>'+
+    '<div class="btn-row"><button class="primary" id="downloadExcel">엑셀 다운로드</button></div>';
+}
+
+function publicView(){
+  if(!publicAuthed){
+    return '<div class="card"><div class="pin-box">'+
+      '<h2 class="card-title" style="text-align:center;">공개 순위 화면</h2>'+
+      '<div id="msgBox"></div>'+
+      '<label>PIN 입력</label>'+
+      '<input type="password" id="publicPinInput" maxlength="8">'+
+      '<div class="btn-row" style="justify-content:center;margin-top:14px;">'+
+      '<button class="primary" id="publicPinSubmit">입장</button>'+
+      '<button class="ghost" id="backHome">뒤로</button></div>'+
+      '</div></div>';
+  }
+  const list=allStudents().filter(s=>maxScore(s)!==null).sort((a,b)=>maxScore(b)-maxScore(a));
+  return '<div class="card">'+
+    '<h2 class="card-title">실시간 종합 순위표</h2>'+
+    rankTable(list,null)+
+    '<div class="btn-row" style="margin-top:16px;"><button class="primary" id="refreshPublic">새로고침</button>'+
+    '<button class="ghost" id="backHome">뒤로</button></div>'+
+    '</div>';
+}
+
+function showMsg(text,ok){
+  const box=document.getElementById('msgBox');
+  if(box)box.innerHTML='<div class="msg '+(ok?'ok':'')+'">'+esc(text)+'</div>';
+}
+
+function bindEvents(){
+  const home=document.getElementById('goHome');
+  if(home)home.onclick=()=>{VIEW='landing';render();};
+  document.querySelectorAll('[data-go]').forEach(el=>{
+    el.onclick=async()=>{
+      const g=el.getAttribute('data-go');
+      if(g==='teacherGate'){VIEW='teacher';teacherAuthed=false;}
+      else if(g==='publicGate'){VIEW='public';publicAuthed=false;}
+      else VIEW=g;
+      await fetchServerDB();
+      render();
+    };
+  });
+  const back=document.getElementById('backHome');
+  if(back)back.onclick=()=>{VIEW='landing';render();};
+
+  if(VIEW==='student')bindStudentEvents();
+  if(VIEW==='teacher')bindTeacherEvents();
+  if(VIEW==='public')bindPublicEvents();
+}
+
+function bindStudentEvents(){
+  const start=document.getElementById('studentStart');
+  if(start)start.onclick=async()=>{
+    const g=Number(document.getElementById('f_grade').value);
+    const c=Number(document.getElementById('f_class').value);
+    const n=Number(document.getElementById('f_num').value);
+    const name=document.getElementById('f_name').value.trim();
+    if(!g||!c||!n||!name){showMsg('학년, 반, 번호, 이름을 모두 입력해주세요.');return;}
+    const id=sid(g,c,n);
+    await fetchServerDB();
+    if(!DB.students[id]){
+      DB.students[id]={id,grade:g,cls:c,number:n,name,scores:{}};
+      await syncToServer({id,grade:g,cls:c,number:n,name});
+    }
+    student=DB.students[id];
+    studentActiveSession=1;
+    render();
+  };
+  const sw=document.getElementById('switchStudent');
+  if(sw)sw.onclick=()=>{student=null;render();};
+  document.querySelectorAll('.session-tab').forEach(el=>{
+    el.onclick=()=>{studentActiveSession=Number(el.getAttribute('data-session'));render();};
+  });
+  const save=document.getElementById('saveScore');
+  if(save)save.onclick=async()=>{
+    const v=document.getElementById('scoreInput').value;
+    if(v===''){showMsg('점수를 입력해주세요.');return;}
+    const scoreNum = Number(v);
+    DB.students[student.id].scores[studentActiveSession]=scoreNum;
+    showMsg('구글 시트로 전송 중입니다...',true);
+    await syncToServer({
+      id: student.id,
+      grade: student.grade,
+      cls: student.cls,
+      number: student.number,
+      name: student.name,
+      session: studentActiveSession,
+      score: scoreNum
+    });
+    showMsg(studentActiveSession+'차시 점수가 구글 시트에 즉시 저장되었습니다!',true);
+    render();
+  };
+}
+
+function bindTeacherEvents(){
+  const pinSubmit=document.getElementById('pinSubmit');
+  if(pinSubmit)pinSubmit.onclick=async()=>{
+    const v=document.getElementById('pinInput').value;
+    if(v===SETTINGS.pin){
+      teacherAuthed=true;
+      teacherTab='list';
+      await fetchServerDB();
+      render();
+    }else showMsg('PIN이 일치하지 않습니다.');
+  };
+  document.querySelectorAll('[data-tab]').forEach(el=>{
+    el.onclick=()=>{teacherTab=el.getAttribute('data-tab');render();};
+  });
+  const rf=document.getElementById('refreshTeacher');
+  if(rf)rf.onclick=async()=>{
+    showMsg('최신 데이터를 불러오는 중...',true);
+    await fetchServerDB();
+    render();
+  };
+  const dl=document.getElementById('downloadExcel');
+  if(dl)dl.onclick=()=>{
+    const wb=XLSX.utils.book_new();
+    const groups={};
+    allStudents().forEach(s=>{const k=s.grade+'학년'+s.cls+'반';(groups[k]=groups[k]||[]).push(s);});
+    Object.keys(groups).sort().forEach(k=>{
+      const arr=groups[k].sort((a,b)=>a.number-b.number);
+      const rows=arr.map(st=>{
+        const row={'번호':st.number,'이름':st.name};
+        SESSIONS.forEach(s=>{row[s+'차시']=st.scores[s]!==undefined&&st.scores[s]!==null?st.scores[s]:'';});
+        row['최고점']=maxScore(st)===null?'':maxScore(st);
+        row['평균']=avgScore(st)===null?'':Number(avgScore(st).toFixed(1));
+        return row;
+      });
+      const ws=XLSX.utils.json_to_sheet(rows);
+      XLSX.utils.book_append_sheet(wb,ws,k.slice(0,31));
+    });
+    XLSX.writeFile(wb,'사격수행평가_실시간.xlsx');
+  };
+}
+
+function bindPublicEvents(){
+  const pinSubmit=document.getElementById('publicPinSubmit');
+  if(pinSubmit)pinSubmit.onclick=async()=>{
+    const v=document.getElementById('publicPinInput').value;
+    if(v===SETTINGS.publicPin){
+      publicAuthed=true;
+      await fetchServerDB();
+      render();
+    }else showMsg('PIN이 일치하지 않습니다.');
+  };
+  const rf=document.getElementById('refreshPublic');
+  if(rf)rf.onclick=async()=>{await fetchServerDB();render();};
+}
+
+(async function init(){
+  document.getElementById('app').innerHTML='<div class="empty-state">구글 시트 연동 준비 중...</div>';
+  await fetchServerDB();
+  render();
+})();
+</script>
+</body>
+</html>
